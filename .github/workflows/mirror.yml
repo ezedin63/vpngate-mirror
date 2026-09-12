@@ -1,0 +1,41 @@
+name: Update VPN Gate Database
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download VPN Gate database
+        run: |
+          mkdir -p data
+          curl -4 -L --fail --retry 3 \
+            --connect-timeout 15 \
+            --max-time 120 \
+            -sS \
+            https://www.vpngate.net/api/iphone/ \
+            -o data/vpngate.csv
+
+      - name: Validate database
+        run: |
+          test -s data/vpngate.csv
+          grep -q '^\*vpn_servers' data/vpngate.csv
+          echo "VPN Gate database validated: $(wc -c < data/vpngate.csv) bytes"
+
+      - name: Commit updated database
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/vpngate.csv
+          git diff --cached --quiet || git commit -m "Update VPN Gate database"
+          git push
